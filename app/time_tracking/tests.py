@@ -7,7 +7,6 @@ from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
 
 
-
 TOKEN_AUTH_URL = reverse('api-token-auth')
 
 
@@ -23,18 +22,20 @@ class TokenAuthenticationApiTests(TestCase):
         )
         self.client.force_authenticate(self.user)
 
-
     def test_invalid_parameters_should_not_return_a_token(self):
-        """Test that the endpoint will return error when user password is invalid"""
-        payload = {"username":self.user.username, "password":"x123qwe"}
+        """
+        Test that the endpoint will return error when user password is invalid
+        """
+        payload = {"username": self.user.username, "password": "x123qwe"}
         res = self.client.post(TOKEN_AUTH_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-
-    def test_get_token_with_valid_user_and_password_should_return_valid_token(self):
-        """Test that the endpoint will return a valid token to the valid user"""
-        payload = {"username":self.user.username, "password":"123qwe"}
+    def test_get_token_with_valid_user_should_return_valid_token(self):
+        """
+        Test that the endpoint will return a valid token to the valid user
+        """
+        payload = {"username": self.user.username, "password": "123qwe"}
         res = self.client.post(TOKEN_AUTH_URL, payload)
         token = Token.objects.get_or_create(user=self.user)
 

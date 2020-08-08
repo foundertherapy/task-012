@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from time_tracking.work_time.models import WorkTime
-from time_tracking.work_time.serializers import WorkTimeSerializer
 
 
 CHECK_OUT_URL = reverse('worktime-checkout-list')
@@ -30,8 +29,6 @@ class PublicCheckOutsApiTests(TestCase):
         res = self.client.post(CHECK_OUT_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
 
 
 class PrivateCheckOutsApiTests(TestCase):

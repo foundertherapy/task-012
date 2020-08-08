@@ -5,9 +5,6 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from time_tracking.work_time.models import WorkTime
-from time_tracking.work_time.serializers import WorkTimeSerializer
-
 
 WORKTIME_URL = reverse('worktime-list')
 
@@ -30,8 +27,6 @@ class PublicWorkTimesApiTests(TestCase):
         res = self.client.post(WORKTIME_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
 
 
 class PrivateWorkTimesApiTests(TestCase):

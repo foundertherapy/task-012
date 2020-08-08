@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from time_tracking.work_time.models import WorkTime
-from time_tracking.work_time.serializers import WorkTimeSerializer
 
 
 CHECK_IN_URL = reverse('worktime-checkin-list')
@@ -30,8 +29,6 @@ class PublicCheckInsApiTests(TestCase):
         res = self.client.post(CHECK_IN_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
 
 
 class PrivateCheckInsApiTests(TestCase):
@@ -59,7 +56,9 @@ class PrivateCheckInsApiTests(TestCase):
         self.assertTrue(exists)
 
     def test_create_checkin_when_alrady_checkdin_shoul_faild(self):
-        """Test create a new check-in while the old check-in doesn't hace checkou"""
+        """
+        Test create a new check-in while the old check-in doesn't have checkout
+        """
         work_time = WorkTime(owner=self.user)
         work_time.save()
         payload = {}

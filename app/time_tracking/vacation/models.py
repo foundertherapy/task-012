@@ -4,9 +4,9 @@ from django.contrib.auth.models import User
 
 class Vacation(models.Model):
     brief_description = models.CharField(max_length=120, blank=True, null=True)
-    start_date        = models.DateField()
-    number_of_days    = models.PositiveSmallIntegerField()
-    owner             = models.ForeignKey(
+    start_date = models.DateField()
+    number_of_days = models.PositiveSmallIntegerField()
+    owner = models.ForeignKey(
         User,
         limit_choices_to={'is_staff': False},
         on_delete=models.CASCADE,

@@ -2,6 +2,7 @@ from rest_framework import permissions, viewsets
 from django.utils import timezone
 from django.db.models import Sum
 from datetime import date
+from django.utils.translation import gettext as _
 
 from rest_framework.response import Response
 from rest_framework import mixins, generics, status
@@ -9,6 +10,7 @@ from rest_framework import mixins, generics, status
 from time_tracking.vacation.models import Vacation
 from time_tracking.vacation.permissions import IsOwner
 from time_tracking.vacation.serializers import VacationSerializer
+
 
 class VacationViewSet(mixins.ListModelMixin,
                       mixins.CreateModelMixin,
@@ -38,13 +40,21 @@ class VacationViewSet(mixins.ListModelMixin,
         if vacation_days_this_year is None:
             return super().create(request, *args, **kwargs)
 
-
         if vacation_days_this_year >= 16:
-            return Response({"detail": "Sorry, you already reached the max vacations days a year."},status=status.HTTP_406_NOT_ACCEPTABLE)
+            return Response(
+                {"detail": _("Reached max vacations days")},
+                status=status.HTTP_406_NOT_ACCEPTABLE)
 
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
-            if vacation_days_this_year+serializer.validated_data['number_of_days'] > 16:
-                return Response({"detail": "Sorry, you can't add more than ["+ str(16-vacation_days_this_year) +"] day"},status=status.HTTP_406_NOT_ACCEPTABLE)
+            if vacation_days_this_year\
+                    + serializer.validated_data['number_of_days'] > 16:
+                remaining_days = 16 - vacation_days_this_year
+                return Response(
+                    {"detail": _("Can't add more than %(days)s") % {
+                        'days': remaining_days
+                    }},
+                    status=status.HTTP_406_NOT_ACCEPTABLE
+                )
             return super().create(request, *args, **kwargs)
-        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
