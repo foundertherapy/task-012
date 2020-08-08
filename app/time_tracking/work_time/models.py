@@ -1,19 +1,28 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.utils.timesince import timesince
 import time
+
 
 class WorkTime(models.Model):
     start_time = models.DateTimeField(blank=False, null=False)
-    end_time   = models.DateTimeField(blank=True, null=True)
+    end_time = models.DateTimeField(blank=True, null=True)
 
-    work_time  = models.PositiveIntegerField(blank=True, null=True, editable=False)
+    work_time = models.PositiveIntegerField(
+        blank=True, null=True, editable=False
+    )
 
-    start_unix_time = models.PositiveIntegerField(blank=False, null=False, editable=False)
-    end_unix_time = models.PositiveIntegerField(blank=True, null=True, editable=False)
+    start_unix_time = models.PositiveIntegerField(
+        blank=False, null=False, editable=False
+    )
 
-    days_count = models.PositiveIntegerField(blank=False, null=False, editable=False)
+    end_unix_time = models.PositiveIntegerField(
+        blank=True, null=True, editable=False
+    )
+
+    days_count = models.PositiveIntegerField(
+        blank=False, null=False, editable=False
+    )
 
     owner = models.ForeignKey(
         User,
@@ -30,7 +39,9 @@ class WorkTime(models.Model):
             self.start_unix_time = time.mktime(time_now.timetuple())
             self.days_count = self.start_unix_time / 86400
         else:
-            self.work_time = int((self.end_time - self.start_time).total_seconds())
+            self.work_time = int(
+                (self.end_time - self.start_time).total_seconds()
+            )
             self.end_unix_time = time.mktime(self.end_time.timetuple())
 
         return super(WorkTime, self).save(*args, **kwargs)
