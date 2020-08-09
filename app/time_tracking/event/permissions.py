@@ -1,16 +1,15 @@
-from rest_framework import permissions
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
-class IsStaffMemberOrReadOnly(permissions.BasePermission):
+class IsStaffMemberOrReadOnly(BasePermission):
     """
-    Custom permission to only allow staff members to edit/create/update/delete.
+    Allow only staff members to edit/create/update/delete while read
+    permissions "GET, HEAD or OPTIONS requests" are allowed to any request.
     """
 
-    def has_object_permission(self, request, view, obj):
-        # Read permissions "GET, HEAD or OPTIONS requests"
-        # are allowed to any request.
-        if request.method in permissions.SAFE_METHODS:
-            return True
-
-        # Write permissions are only allowed to staff members.
-        return request.user.is_staff is True
+    def has_permission(self, request, view):
+        return bool(
+            request.method in SAFE_METHODS or
+            request.user and
+            request.user.is_staff is True
+        )

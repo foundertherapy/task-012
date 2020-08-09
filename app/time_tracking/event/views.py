@@ -1,4 +1,4 @@
-from rest_framework import permissions, viewsets
+from rest_framework import viewsets
 
 from time_tracking.event.models import Event
 from time_tracking.event.permissions import IsStaffMemberOrReadOnly
@@ -12,7 +12,7 @@ class EventViewSet(viewsets.ModelViewSet):
     """
     queryset = Event.objects.all()
     serializer_class = EventSerializer
-    permission_classes = [
-        permissions.IsAuthenticatedOrReadOnly,
-        IsStaffMemberOrReadOnly
-    ]
+    permission_classes = [IsStaffMemberOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
