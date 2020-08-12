@@ -34,11 +34,12 @@ router = DefaultRouter()
 router.register(r'events', EventViewSet, basename='event')
 router.register(r'vacation', VacationViewSet, basename='vacation')
 
-router.register(r'workTime/check-in',
+router.register(r'work-time/check-in',
                 WorkTimeCheckInViewSet, basename='worktime-checkin')
-router.register(r'workTime/check-out',
+router.register(r'work-time/check-out',
                 WorkTimeCheckOutViewSet, basename='worktime-checkout')
-router.register(r'workTime', WorkTimeViewSet, basename='worktime')
+router.register(r'work-time', WorkTimeViewSet, basename='worktime')
+
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [
@@ -47,21 +48,21 @@ urlpatterns = [
 ]
 
 urlpatterns += format_suffix_patterns([
-    path('workTimeStatistic/week',
+    path('work-time-statistic/week',
          statistic_views.week_statistics_detail,
          name='worktime-week-statistic'),
-    path('workTimeStatistic/quarter',
+    path('work-time-statistic/quarter',
          statistic_views.quarter_statistics_detail,
          name='worktime-quarter-statistic'),
-    path('workTimeStatistic/year',
+    path('work-time-statistic/year',
          statistic_views.year_statistics_detail,
          name='worktime-year-statistic'),
-    path('workTimeStatistic/arrive-and-leave',
+    path('work-time-statistic/arrive-and-leave',
          statistic_views.employees_arrival_to_leaving_time_detail,
          name='work-arrival-and-leaving-time-statistic'),
-    path('workTimeStatistic/work-to-leave-avarage',
+    path('work-time-statistic/work-to-leave-avarage',
          statistic_views.working_ours_to_leaving_hours_detail,
-         name='work-hours-to-leav-hours-statistic'),
+         name='work-hours-to-leave-hours-statistic'),
 ])
 
 urlpatterns += [

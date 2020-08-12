@@ -24,7 +24,7 @@ VALID_PAYLOAD = {
 
 
 def detail_url(event_id):
-    """Return recipe detail URL"""
+    """Return event detail URL"""
     return reverse('event-detail', args=[event_id])
 
 
@@ -124,7 +124,7 @@ class StaffUsersEventsApiTests(TestCase):
         event.refresh_from_db()
         self.assertEqual(event.title, payload['title'])
 
-    def test_delete_event_unauthorized(self):
+    def test_delete_event(self):
         """Test delete an event"""
         event = sample_event(user=self.user)
         url = detail_url(event.id)

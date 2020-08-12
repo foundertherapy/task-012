@@ -20,7 +20,7 @@ ARRIVAL_AND_LEAVING_STATISTIC_URL = reverse(
     'work-arrival-and-leaving-time-statistic'
 )
 WORK_TO_LEAVE_STATISTIC_URL = reverse(
-    'work-hours-to-leav-hours-statistic'
+    'work-hours-to-leave-hours-statistic'
 )
 
 
