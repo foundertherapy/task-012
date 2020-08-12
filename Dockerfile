@@ -7,7 +7,7 @@ COPY ./requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 RUN apk --no-cache add gettext
 
-RUN mkdir /app
+RUN mkdir -p /app
 WORKDIR /app
 COPY ./app /app
 

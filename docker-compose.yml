@@ -1,12 +1,12 @@
 version: '3.7'
 
 services:
-    app:
+    time_tracking:
         build:
             context: .
         ports:
-            - "8080:8000"
+            - "8080:8080"
         volumes:
             - ./app:/app
         command: >
-            sh -c "python manage.py runserver 0:8000"
+            sh -c "python manage.py runserver 0:8080"
