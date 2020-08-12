@@ -37,8 +37,10 @@ class PrivateCheckInsApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(
+            'test-user'
             'test@test.com',
-            '123qwe'
+            '123qwe',
+            is_staff=False,
         )
         self.client.force_authenticate(self.user)
 
@@ -49,13 +51,13 @@ class PrivateCheckInsApiTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         exists = WorkTime.objects.filter(
-            start_time__isnull=False,
-            end_time__isnull=True,
+            unix_start_time__isnull=False,
+            unix_end_time__isnull=True,
             owner=self.user,
         ).exists()
         self.assertTrue(exists)
 
-    def test_create_checkin_when_alrady_checkdin_shoul_faild(self):
+    def test_create_checkin_while_checked(self):
         """
         Test create a new check-in while the old check-in doesn't have checkout
         """

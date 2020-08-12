@@ -1,28 +1,27 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-import time
+import datetime
+
+
+def convert_time_to_unix(date_time):
+    """Convert the datetime.time/datetime.datetime to unix time"""
+    return datetime.timedelta(
+        hours=date_time.hour,
+        minutes=date_time.minute,
+        seconds=date_time.second,
+    ).total_seconds()
 
 
 class WorkTime(models.Model):
-    start_time = models.DateTimeField(blank=False, null=False)
-    end_time = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    work_time = models.PositiveIntegerField(
-        blank=True, null=True, editable=False
-    )
-
-    start_unix_time = models.PositiveIntegerField(
-        blank=False, null=False, editable=False
-    )
-
-    end_unix_time = models.PositiveIntegerField(
-        blank=True, null=True, editable=False
-    )
-
-    days_count = models.PositiveIntegerField(
-        blank=False, null=False, editable=False
-    )
+    start_date = models.DateField(auto_now_add=True, editable=True)
+    # this represents datetime.time
+    unix_start_time = models.PositiveIntegerField()
+    # this represents datetime.time
+    unix_end_time = models.PositiveIntegerField(blank=True, null=True)
 
     owner = models.ForeignKey(
         User,
@@ -33,18 +32,11 @@ class WorkTime(models.Model):
 
     def save(self, *args, **kwargs):
         """ On create, set start_time """
-        if not self.id:
+        if not self.pk:
             time_now = timezone.now()
-            self.start_time = time_now
-            self.start_unix_time = time.mktime(time_now.timetuple())
-            self.days_count = self.start_unix_time / 86400
-        else:
-            self.work_time = int(
-                (self.end_time - self.start_time).total_seconds()
-            )
-            self.end_unix_time = time.mktime(self.end_time.timetuple())
+            self.unix_start_time = convert_time_to_unix(time_now)
 
         return super(WorkTime, self).save(*args, **kwargs)
 
     class Meta:
-        ordering = ['-start_time']
+        ordering = ['-start_date', '-unix_start_time']
