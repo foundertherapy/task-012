@@ -37,8 +37,10 @@ class PrivateCheckOutsApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(
+            'test-user'
             'test@test.com',
-            '123qwe'
+            '123qwe',
+            is_staff=False,
         )
         self.client.force_authenticate(self.user)
 
@@ -51,8 +53,17 @@ class PrivateCheckOutsApiTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         exists = WorkTime.objects.filter(
-            start_time__isnull=False,
-            end_time__isnull=False,
+            unix_start_time__isnull=False,
+            unix_end_time__isnull=False,
             owner=self.user,
         ).exists()
         self.assertTrue(exists)
+
+    def test_create_checkout_while_not_checkedin(self):
+        """
+        Test create a new check-out without having an active check-in
+        """
+        payload = {}
+        res = self.client.post(CHECK_OUT_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
