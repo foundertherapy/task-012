@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from time_tracking.work_time.models import WorkTime
-from time_tracking.work_time.serializers import WorkTimeSerializer
 
 
 CHECK_OUT_URL = reverse('worktime-checkout-list')
@@ -32,16 +31,16 @@ class PublicCheckOutsApiTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-
-
 class PrivateCheckOutsApiTests(TestCase):
     """Test the private checkOuts API"""
 
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(
+            'test-user'
             'test@test.com',
-            '123qwe'
+            '123qwe',
+            is_staff=False,
         )
         self.client.force_authenticate(self.user)
 
@@ -54,8 +53,17 @@ class PrivateCheckOutsApiTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         exists = WorkTime.objects.filter(
-            start_time__isnull=False,
-            end_time__isnull=False,
+            unix_start_time__isnull=False,
+            unix_end_time__isnull=False,
             owner=self.user,
         ).exists()
         self.assertTrue(exists)
+
+    def test_create_checkout_while_not_checkedin(self):
+        """
+        Test create a new check-out without having an active check-in
+        """
+        payload = {}
+        res = self.client.post(CHECK_OUT_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

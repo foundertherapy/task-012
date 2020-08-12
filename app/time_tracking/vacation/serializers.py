@@ -1,28 +1,43 @@
+from django.utils.translation import gettext as _
+from django.utils import timezone
 from rest_framework import serializers
 
 from time_tracking.vacation.models import Vacation
 
 
-class VacationSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    url = serializers.HyperlinkedIdentityField(view_name='vacation-detail')
-    brief_description = serializers.CharField(required=False, allow_blank=True, max_length=120)
-    start_date = serializers.DateField()
+class VacationSerializer(serializers.ModelSerializer):
     number_of_days = serializers.IntegerField(max_value=16, min_value=1)
     owner = serializers.ReadOnlyField(source='owner.username')
 
-    def create(self, validated_data):
-        """
-        Create and return a new `Vacation` instance, given the validated data.
-        """
-        return Vacation.objects.create(**validated_data)
+    class Meta:
+        model = Vacation
+        fields = [
+            'id', 'url', 'brief_description', 'start_date',
+            'number_of_days', 'owner'
+        ]
 
-    def update(self, instance, validated_data):
+    def validate_start_date(self, value):
         """
-        Update and return an existing `Vacation` instance, given the validated data.
+        Check that the start_date was not modify and that
+        the start_date is not on the past
         """
-        instance.brief_description = validated_data.get('brief_description', instance.brief_description)
-        instance.start_date = validated_data.get('start_date', instance.start_date)
-        instance.number_of_days = validated_data.get('number_of_days', instance.number_of_days)
-        instance.save()
-        return instance
+        if self.instance and self.instance.start_date != value:
+            raise serializers.ValidationError(
+                _("Changing start_date is not allowed")
+            )
+
+        if self.instance is None and value < timezone.now().date():
+            raise serializers.ValidationError(
+                _("start_date can not be from the past")
+            )
+        return value
+
+    def validate_number_of_days(self, value):
+        """
+        Check that the number_of_days was not modify
+        """
+        if self.instance and self.instance.number_of_days != value:
+            raise serializers.ValidationError(
+                _("Changing number_of_days is not allowed")
+            )
+        return value

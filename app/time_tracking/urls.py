@@ -20,7 +20,11 @@ from rest_framework.authtoken import views
 
 from rest_framework.urlpatterns import format_suffix_patterns
 from time_tracking.event.views import EventViewSet
-from time_tracking.work_statistic import views as StatistecViews
+from time_tracking.work_statistic.views import (
+    WorkTimeStatisticsDetail,
+    EmployeesArrivalAndLeavingTimesStatisticsDetail,
+    WorkingHoursToLeavingHoursStatisticsDetail,
+)
 from time_tracking.vacation.views import VacationViewSet
 from time_tracking.work_time.views import (
     WorkTimeViewSet,
@@ -33,21 +37,32 @@ from time_tracking.work_time.views import (
 router = DefaultRouter()
 router.register(r'events', EventViewSet, basename='event')
 router.register(r'vacation', VacationViewSet, basename='vacation')
-router.register(r'workTime/check-in', WorkTimeCheckInViewSet, basename='worktime-checkin')
-router.register(r'workTime/check-out', WorkTimeCheckOutViewSet, basename='worktime-checkout')
-router.register(r'workTime', WorkTimeViewSet, basename='worktime')
+
+router.register(r'work-time/check-in',
+                WorkTimeCheckInViewSet, basename='worktime-checkin')
+router.register(r'work-time/check-out',
+                WorkTimeCheckOutViewSet, basename='worktime-checkout')
+router.register(r'work-time', WorkTimeViewSet, basename='worktime')
+
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include(router.urls)),
 ]
+
 urlpatterns += format_suffix_patterns([
-    path('workTimeStatistic/week', StatistecViews.week_statistics_detail, name='worktime-week-statistic'),
-    path('workTimeStatistic/quarter', StatistecViews.quarter_statistics_detail, name='worktime-quarter-statistic'),
-    path('workTimeStatistic/year', StatistecViews.year_statistics_detail, name='worktime-year-statistic'),
-    path('workTimeStatistic/arrive-and-leave', StatistecViews.employees_arrival_and_leving_time_statistics_detail, name='work-arrival-and-leaving-time-statistic'),
-    path('workTimeStatistic/work-to-leave-avarage', StatistecViews.working_ours_to_leaving_hours_detail, name='work-hours-to-leav-hours-statistic'),
+
+    path('work-time-statistic/arrive-and-leave-times',
+         EmployeesArrivalAndLeavingTimesStatisticsDetail.as_view(),
+         name='work-arrival-and-leaving-time-statistic'),
+    path('work-time-statistic/work-to-leave-time-average',
+         WorkingHoursToLeavingHoursStatisticsDetail.as_view(),
+         name='work-hours-to-leave-hours-statistic'),
+
+    path(r'work-time-statistic/<slug:period>',
+         WorkTimeStatisticsDetail.as_view(),
+         name='work-time-periods-statistic'),
 ])
 
 urlpatterns += [

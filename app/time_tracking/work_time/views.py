@@ -1,7 +1,9 @@
 from rest_framework import permissions, viewsets
 from django.utils import timezone
+from django.utils.translation import gettext as _
+from django.core.exceptions import ObjectDoesNotExist as DoesNotExist
 
-from time_tracking.work_time.models import WorkTime
+from time_tracking.work_time.models import WorkTime, convert_time_to_unix
 from rest_framework import mixins, generics, status
 from rest_framework.response import Response
 from time_tracking.work_time.serializers import (
@@ -18,13 +20,11 @@ class WorkTimeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = WorkTimeSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-
     def get_queryset(self):
         return WorkTime.objects.filter(owner=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
-
 
 
 class GenericViewSet(viewsets.ViewSetMixin, generics.GenericAPIView):
@@ -41,7 +41,6 @@ class GenericViewSet(viewsets.ViewSetMixin, generics.GenericAPIView):
         serializer.save(owner=self.request.user)
 
 
-
 class WorkTimeCheckOutViewSet(mixins.ListModelMixin,
                               GenericViewSet):
     """
@@ -49,20 +48,26 @@ class WorkTimeCheckOutViewSet(mixins.ListModelMixin,
     """
     serializer_class = WorkTimeCheckOutSerializer
 
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
     def create(self, request, *args, **kwargs):
-        instance = self.get_queryset().first()
-        if instance is None or instance.end_time is not None:
-            return Response({"detail": "Bad request you are not checked in"},status=status.HTTP_400_BAD_REQUEST)
+        try:
+            instance = self.get_queryset().filter(
+                unix_end_time__isnull=True
+            ).get()
+        except DoesNotExist:
+            return Response(
+                {"detail": _("Bad request you are not checked in")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = self.get_serializer(instance, data=request.data)
-        instance.end_time = timezone.now()
         serializer.is_valid(raise_exception=True)
+
+        time_now = timezone.now()
+        instance.unix_end_time = convert_time_to_unix(time_now)
+        instance
+
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
 
 
 class WorkTimeCheckInViewSet(mixins.CreateModelMixin,
@@ -73,16 +78,17 @@ class WorkTimeCheckInViewSet(mixins.CreateModelMixin,
     """
     serializer_class = WorkTimeCheckInSerializer
 
-
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
     def create(self, request, *args, **kwargs):
-        instance = self.get_queryset().first()
-        if instance is None or instance.end_time is not None:
-            return super().create(request, *args, **kwargs)
-        return Response({"detail": "Bad request you are alrady checked in"},status=status.HTTP_400_BAD_REQUEST)
+        is_instance_exists = self.get_queryset().filter(
+            unix_end_time__isnull=True).exists()
 
+        if is_instance_exists is False:
+            return super().create(request, *args, **kwargs)
+
+        return Response(
+            {"detail": _("Bad request you are already checked in")},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)

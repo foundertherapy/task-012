@@ -1,148 +1,155 @@
-from rest_framework import permissions, viewsets
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, F, Min, Max
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import FloatField
 
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from time_tracking.work_time.models import WorkTime
+from time_tracking.work_time.serializers import convert_unix_to_time
+
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from time_tracking.work_time.models import WorkTime
 
-
-@api_view(['GET'])
-@permission_classes((IsAuthenticated, ))
-def week_statistics_detail(request, format=None):
+class WorkTimeStatisticsDetail(APIView):
     """
-    Retrieve work time since a week ago.
+    Retrieve work time since a `week`, a `quarter` or a `year` ago.
     """
-    if request.method == 'GET':
-        work_times = WorkTime.objects.filter(
-            owner=request.user,
-            work_time__isnull=False,
-            end_time__gt=timezone.now() - timedelta(weeks=1)
-        ).aggregate(Sum('work_time'))
-        responce = {
-            "total_working_time_in_seconds": work_times['work_time__sum']
-        }
+    permission_classes = [IsAuthenticated, ]
 
-        return Response(responce, status.HTTP_200_OK)
+    def get_queryset(self):
+        return WorkTime.objects.filter(
+            owner=self.request.user,
+            unix_end_time__isnull=False,
+        )
 
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+    def calculate_work_times(self, queryset):
+        return queryset.annotate(
+            diff=F('unix_end_time') - F('unix_start_time')
+        ).values('diff').aggregate(sum=Sum('diff'))
 
+    def get_statistics_before(self, **kwargs):
+        """
+        Calculates the work time since a previous date.
+        """
+        previous_date = (
+                timezone.now() - timedelta(**kwargs)
+        ).date()
 
+        work_times = self.calculate_work_times(
+            self.get_queryset().filter(
+                start_date__gte=previous_date
+            )
+        )
 
-@api_view(['GET'])
-@permission_classes((IsAuthenticated, ))
-def quarter_statistics_detail(request, format=None):
-    """
-    Retrieve work time since a 13 weeks ago.
-    """
-    if request.method == 'GET':
-        work_times = WorkTime.objects.filter(
-            owner=request.user,
-            work_time__isnull=False,
-            end_time__gt=timezone.now() - timedelta(weeks=13)
-        ).aggregate(Sum('work_time'))
-        responce = {
-            "total_working_time_in_seconds": work_times['work_time__sum']
-        }
+        return Response(
+            {"total_working_time_in_seconds": work_times['sum']},
+            status.HTTP_200_OK
+        )
 
-        return Response(responce, status.HTTP_200_OK)
+    def get(self, request, period, form=None):
 
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        if period.lower() == 'week':
+            return self.get_statistics_before(weeks=1)
+        elif period == 'quarter':
+            return self.get_statistics_before(weeks=13)
+            pass
+        elif period == 'year':
+            return self.get_statistics_before(days=356)
+            pass
 
-
-@api_view(['GET'])
-@permission_classes((IsAuthenticated, ))
-def year_statistics_detail(request, format=None):
-    """
-    Retrieve work time since a 356 days ago.
-    """
-    if request.method == 'GET':
-        work_times = WorkTime.objects.filter(
-            owner=request.user,
-            work_time__isnull=False,
-            end_time__gt=timezone.now() - timedelta(days=356)
-        ).aggregate(Sum('work_time'))
-        responce = {
-            "total_working_time_in_seconds": work_times['work_time__sum']
-        }
-
-        return Response(responce, status.HTTP_200_OK)
-
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-
-@api_view(['GET'])
-@permission_classes((IsAuthenticated, ))
-def employees_arrival_and_leving_time_statistics_detail(request, format=None):
+class EmployeesArrivalAndLeavingTimesStatisticsDetail(APIView):
     """
     Retrieve the employees arrival time and leaving times.
     """
-    if request.method == 'GET':
-        responce = []
-        for user in User.objects.filter(is_staff=False):
-            avg_work_time_starts = WorkTime.objects.filter(owner=user).aggregate(Avg('start_unix_time'))['start_unix_time__avg']
-            avg_work_time_ends = WorkTime.objects.filter(owner=user).aggregate(Avg('end_unix_time'))['end_unix_time__avg']
+    permission_classes = [IsAuthenticated, ]
 
-            if avg_work_time_starts is not None:
-                avg_work_time_starts = datetime.fromtimestamp(avg_work_time_starts)
-            if avg_work_time_ends is not None:
-                avg_work_time_ends = datetime.fromtimestamp(avg_work_time_ends)
+    def get_queryset(self):
+        return User.objects.all()
 
-            responce.append({
-                'user': user.username,
-                'avarage_arraival_time': avg_work_time_starts,
-                'avarage_leaving_time': avg_work_time_ends,
+    def get(self, request, form=None):
+        response = []
+
+        employees_stats = self.get_queryset().values(
+            'work_times__start_date', 'username'
+        ).annotate(
+            min=Min('work_times__unix_start_time'),
+            max=Max('work_times__unix_end_time')
+        ).values(
+            'username', 'min', 'max'
+        )
+
+        users = User.objects.all().values_list('username', flat=True)
+        for user in users:
+            average_time = employees_stats.filter(
+                username=user
+            ).values('min', 'max').aggregate(
+                avg_start=Avg('min'),
+                avg_end=Avg('max')
+            )
+            response.append({
+                'user': user,
+                'average_arrival_time':
+                    convert_unix_to_time(average_time['avg_start']),
+                'average_leaving_time':
+                    convert_unix_to_time(average_time['avg_end']),
             })
 
-        return Response(responce, status.HTTP_200_OK)
-
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(response, status.HTTP_200_OK)
 
 
-
-@api_view(['GET'])
-@permission_classes((IsAuthenticated, ))
-def working_ours_to_leaving_hours_detail(request, format=None):
+class WorkingHoursToLeavingHoursStatisticsDetail(APIView):
     """
     Retrieve the team working hours to leaving hours
     """
-    if request.method == 'GET':
-        working_hours = 0
-        leaving_hours = 0
-        for user in User.objects.filter():
-            work_times_grouped_by_owner_and_date = WorkTime.objects.filter(
-                owner=user,
-                end_unix_time__isnull=False,
-                start_unix_time__isnull=False
-            ).values(
-                'days_count', 'start_unix_time', 'end_unix_time'
-            ).annotate(days=Count('days_count')).order_by('-start_unix_time')
+    permission_classes = [IsAuthenticated, ]
 
-            length = len(work_times_grouped_by_owner_and_date)
-            index = 0
+    def get_queryset(self):
+        return User.objects.filter(
+            work_times__unix_end_time__isnull=False
+        )
 
-            for work_time in work_times_grouped_by_owner_and_date:
-                working_hours += work_time['end_unix_time'] - work_time['start_unix_time']
-                if ++index < length - 1:
-                    leaving_hours += work_times_grouped_by_owner_and_date[index]['start_unix_time'] - work_time['end_unix_time']
+    def get(self, request, form=None):
+        stats = self.get_queryset().annotate(
+            work_time=F(
+                'work_times__unix_end_time'
+            ) - F(
+                'work_times__unix_start_time'
+            )
+        ).values(
+            'work_times__start_date', 'username'
+        ).annotate(
+            start_to_end_hours=(Max(
+                'work_times__unix_end_time', output_field=FloatField()
+            ) - Min(
+                'work_times__unix_start_time', output_field=FloatField()
+            )) / 3600.0,
+            work_time_sum_hours=Sum(
+                'work_time', output_field=FloatField()
+            ) / 3600.0,
+        ).values(
+            'start_to_end_hours', 'work_time_sum_hours'
+        ).aggregate(
+            leave_hours=Sum(
+                F('start_to_end_hours') - F('work_time_sum_hours')
+            ),
+            work_hours=Sum('work_time_sum_hours'),
+        )
 
-        if working_hours is 0 or leaving_hours is 0:
-            work_over_leav = 0
+        if stats['leave_hours'] == 0:
+            work_over_leave = None
         else:
-            work_over_leav = working_hours / leaving_hours
-        responce = {
-            'working_time': working_hours,
-            'leaving_time': leaving_hours,
-            'work_on_leav_time': work_over_leav,
+            work_over_leave = stats['work_hours'] / stats['leave_hours'] * 100
+
+        response = {
+            'working_hours': stats['work_hours'],
+            'leaving_hours': stats['leave_hours'],
+            'work_on_leave_hours': work_over_leave,
         }
 
-        return Response(responce, status.HTTP_200_OK)
-
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(response, status.HTTP_200_OK)
