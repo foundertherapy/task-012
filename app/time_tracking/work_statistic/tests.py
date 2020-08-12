@@ -12,9 +12,12 @@ from time_tracking.work_time.models import WorkTime, convert_time_to_unix
 from time_tracking.work_time.serializers import convert_unix_to_time
 
 
-WEEK_STATISTIC_URL = reverse('worktime-week-statistic')
-QUARTER_STATISTIC_URL = reverse('worktime-quarter-statistic')
-YEAR_STATISTIC_URL = reverse('worktime-year-statistic')
+WEEK_STATISTIC_URL = reverse(
+    'work-time-periods-statistic', args=['week'])
+QUARTER_STATISTIC_URL = reverse(
+    'work-time-periods-statistic', args=['quarter'])
+YEAR_STATISTIC_URL = reverse(
+    'work-time-periods-statistic', args=['year'])
 
 ARRIVAL_AND_LEAVING_STATISTIC_URL = reverse(
     'work-arrival-and-leaving-time-statistic'
@@ -51,6 +54,39 @@ def sample_work_time(user, start_days_ago=1,
     wt.start_date = defaults['start_date']
     wt.save()
     return wt
+
+
+class PublicStatisticApiTests(TestCase):
+    """Test the publicly available statistic API"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_time_statistic_request(self):
+        """
+        Test that login is required to access the week_statistic endpoint
+        """
+        res = self.client.get(WEEK_STATISTIC_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_arrival_and_leaving_statistics_request(self):
+        """
+        Test that login is required to access the \
+        arrival_and_leaving_statistics endpoint
+        """
+        res = self.client.get(ARRIVAL_AND_LEAVING_STATISTIC_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_work_to_leave_statistic_request(self):
+        """
+        Test that login is required to access the \
+        work_to_leave_statistic endpoint
+        """
+        res = self.client.get(WORK_TO_LEAVE_STATISTIC_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PrivateStatisticApiTests(TestCase):
@@ -146,3 +182,20 @@ class PrivateStatisticApiTests(TestCase):
             stats['average_leaving_time'],
             convert_unix_to_time(end_time['avg'])
         )
+
+    def test_work_to_leave_statistic_when_leave_time_is_zero(self):
+        """
+        Test that work_to_leave_statistic can handle leaving time peeing zero
+        """
+        res = self.client.get(WORK_TO_LEAVE_STATISTIC_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            res.data['working_hours'],
+            self.this_year_working_hours
+        )
+        self.assertEqual(
+            res.data['leaving_hours'],
+            0
+        )
+        self.assertIsNone(res.data['work_on_leave_hours'])
