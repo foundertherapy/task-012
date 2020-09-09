@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models import Sum, Avg, F, Min, Max, TimeField, DateField
 from django.db.models.functions import TruncDay, TruncTime
 from django.utils import timezone
+from django.core.cache import cache
 
 from rest_framework import status, viewsets, mixins
 from rest_framework.permissions import IsAdminUser
@@ -52,23 +53,32 @@ class WorkTimeStatisticsDetail(APIView):
         return seconds_sum / 3600
 
     def get(self, request, period, user_id):
-        days_count = self.period_name_with_days_count.get(period.lower())
-        if days_count is None:
+        period = period.lower()
+        days_count = self.period_name_with_days_count.get(period)
+        if days_count is None or User.objects.filter(pk=user_id).exists() is False:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        today_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        previous_datetime = today_datetime - timedelta(days=days_count)
+        total_working_hours = cache.get(f'total_working_hours_for_a_{period}_to_user_{user_id}')
 
-        serializer = self.serializer_class(
-            {
-                'total_working_hours': self.calculate_working_hours(
-                    self.get_queryset().filter(
-                        owner=user_id, start_datetime__gte=previous_datetime
-                    ).exclude(
-                        start_datetime__gt=today_datetime
-                    ))
-            }
-        )
+        if total_working_hours is None:
+            today_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            previous_datetime = today_datetime - timedelta(days=days_count)
+
+            total_working_hours = self.calculate_working_hours(
+                self.get_queryset().filter(
+                    owner=user_id,
+                    start_datetime__gte=previous_datetime
+                ).exclude(start_datetime__gt=today_datetime)
+            )
+            cache.set(
+                f'total_working_hours_for_a_{period}_to_user_{user_id}',
+                total_working_hours,
+                timedelta(hours=1).total_seconds()
+            )
+
+        serializer = self.serializer_class({
+            'total_working_hours': total_working_hours
+        })
 
         return Response(
             serializer.data,
@@ -89,15 +99,21 @@ class EmployeesArrivalAndLeavingTimesStatisticsDetail(mixins.RetrieveModelMixin,
 
     def retrieve(self, request, *args, **kwargs):
         user = self.get_object()
-        employees_stats = WorkTime.objects.filter(owner=user).values(
+        query = WorkTime.objects.filter(owner=user).values(
             day=TruncDay('start_datetime'),
         ).annotate(
             min=TruncTime(Min('start_datetime')),
             max=TruncTime(Max('end_datetime')),
-        ).aggregate(
-            avg_start=Avg('min', output_field=TimeField()),
-            avg_end=Avg('max', output_field=TimeField())
         )
+
+        employees_stats = cache.get_or_set(
+            f'avg_arrival_and_leaving_time_for_user_{user.pk}',
+            query.aggregate(
+                avg_start=Avg('min', output_field=TimeField()),
+                avg_end=Avg('max', output_field=TimeField())),
+            timedelta(hours=1).total_seconds()
+        )
+
         avg_arrival = None
         avg_leave = None
 
@@ -127,7 +143,7 @@ class WorkingHoursToLeavingHoursStatisticsDetail(mixins.ListModelMixin, viewsets
         working time = select all the time and sum it together
         leaving time = sum all the leaving time per day for the user and sum them
         """
-        stats = User.objects.filter(is_staff=False, work_times__end_datetime__isnull=False).annotate(
+        query = User.objects.filter(is_staff=False, work_times__end_datetime__isnull=False).annotate(
             work_time=F('work_times__end_datetime') - F('work_times__start_datetime'),
             end_datetime=F('work_times__end_datetime'),
             start_datetime=F('work_times__start_datetime'),
@@ -138,10 +154,12 @@ class WorkingHoursToLeavingHoursStatisticsDetail(mixins.ListModelMixin, viewsets
         ).values(
             'username', 'total_work_time_per_day', 'start_to_end_time_per_day'
         )
-        # import pdb;pdb.set_trace()
-        stats = stats.aggregate(
-            leaving_hours=Sum(F('start_to_end_time_per_day') - F('total_work_time_per_day')),
-            working_hours=Sum('total_work_time_per_day'),
+
+        stats = cache.get_or_set(
+            'team_work_to_leave_hours', query.aggregate(
+                leaving_hours=Sum(F('start_to_end_time_per_day') - F('total_work_time_per_day')),
+                working_hours=Sum('total_work_time_per_day')),
+            timedelta(days=1).total_seconds()
         )
 
         working_hours = (stats['working_hours'] or timedelta()).total_seconds() / 3600
