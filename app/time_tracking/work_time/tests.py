@@ -110,13 +110,13 @@ class PrivateWorkTimesApiTests(TestCase):
         """Test retrieving the workTime for the user"""
         work_time = sample_work_time(self.user)
         res = self.client.get(WORK_TIME_URL)
-        wts = WorkTimeSerializer(data=res.data[0])
+        wts = WorkTimeSerializer(data=res.data['results'][0])
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(res.data), 1)
+        self.assertEqual(len(res.data['results']), 1)
 
         self.assertTrue(wts.is_valid(), f"validate the resulted data isn't correct {wts.errors}")
-        self.assertEqual(res.data[0]['id'], work_time.id)
+        self.assertEqual(res.data['results'][0]['id'], work_time.id)
         self.assertEqual(
             wts.validated_data['start_datetime'],
             work_time.start_datetime
@@ -132,7 +132,7 @@ class PrivateWorkTimesApiTests(TestCase):
         res = self.client.get(WORK_TIME_URL)
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(res.data), 0)
+        self.assertEqual(len(res.data['results']), 0)
 
     def test_create_should_fail_when_checkout_is_after_checkout_time(self):
         """
