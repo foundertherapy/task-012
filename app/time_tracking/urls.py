@@ -22,15 +22,12 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from time_tracking.event.views import EventViewSet
 from time_tracking.work_statistic.views import (
     WorkTimeStatisticsDetail,
+    WorkTimeUsersAvailableStatistics,
     EmployeesArrivalAndLeavingTimesStatisticsDetail,
     WorkingHoursToLeavingHoursStatisticsDetail,
 )
 from time_tracking.vacation.views import VacationViewSet
-from time_tracking.work_time.views import (
-    WorkTimeViewSet,
-    WorkTimeCheckInViewSet,
-    WorkTimeCheckOutViewSet
-)
+from time_tracking.work_time.views import WorkTimeViewSet
 
 
 # Create a router and register our viewsets with it.
@@ -38,12 +35,19 @@ router = DefaultRouter()
 router.register(r'events', EventViewSet, basename='event')
 router.register(r'vacation', VacationViewSet, basename='vacation')
 
-router.register(r'work-time/check-in',
-                WorkTimeCheckInViewSet, basename='worktime-checkin')
-router.register(r'work-time/check-out',
-                WorkTimeCheckOutViewSet, basename='worktime-checkout')
 router.register(r'work-time', WorkTimeViewSet, basename='worktime')
 
+router.register(r'work-time-statistics',
+                WorkTimeUsersAvailableStatistics,
+                basename='worktime-available-statistics')
+
+router.register(r'work-time-statistic/arrive-and-leave-times',
+                EmployeesArrivalAndLeavingTimesStatisticsDetail,
+                basename='work-arrival-and-leaving-time-statistic')
+
+router.register(r'team-statistics/work-to-leave-time-average',
+                WorkingHoursToLeavingHoursStatisticsDetail,
+                basename='work-hours-to-leave-hours-statistic')
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [
@@ -52,15 +56,7 @@ urlpatterns = [
 ]
 
 urlpatterns += format_suffix_patterns([
-
-    path('work-time-statistic/arrive-and-leave-times',
-         EmployeesArrivalAndLeavingTimesStatisticsDetail.as_view(),
-         name='work-arrival-and-leaving-time-statistic'),
-    path('work-time-statistic/work-to-leave-time-average',
-         WorkingHoursToLeavingHoursStatisticsDetail.as_view(),
-         name='work-hours-to-leave-hours-statistic'),
-
-    path(r'work-time-statistic/<slug:period>',
+    path(r'work-time-statistic/<slug:period>/<int:user_id>/',
          WorkTimeStatisticsDetail.as_view(),
          name='work-time-periods-statistic'),
 ])

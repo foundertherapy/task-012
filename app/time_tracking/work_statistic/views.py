@@ -1,155 +1,159 @@
-from django.db.models import Sum, Avg, F, Min, Max
-from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.contrib.auth.models import User
-from django.db.models import FloatField
+from django.db.models import Sum, Avg, F, Min, Max, TimeField, DateField
+from django.db.models.functions import TruncDay, TruncTime
+from django.utils import timezone
 
-from rest_framework.permissions import IsAuthenticated
-from time_tracking.work_time.models import WorkTime
-from time_tracking.work_time.serializers import convert_unix_to_time
-
-from rest_framework.views import APIView
+from rest_framework import status, viewsets, mixins
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import APIView
+
+from time_tracking.work_statistic.serializers import (
+    EmployeesArrivalAndLeavingTimesSerializer,
+    TeamWorkingToLeavingTimeStatisticsSerializer,
+    UserTotalWorkingHoursStatisicsSerializer,
+    UsersAvailableWorkTimeStatisticsSerializer,
+)
+from time_tracking.work_time.models import WorkTime
+
+
+class WorkTimeUsersAvailableStatistics(viewsets.ReadOnlyModelViewSet):
+    """
+    List the users and there available statistics
+    """
+    serializer_class = UsersAvailableWorkTimeStatisticsSerializer
+    permission_classes = [IsAdminUser, ]
+
+    def get_queryset(self):
+        return User.objects.filter(is_staff=False)
 
 
 class WorkTimeStatisticsDetail(APIView):
     """
-    Retrieve work time since a `week`, a `quarter` or a `year` ago.
+    Retrieve work hours since a `week`, a `quarter` or a `year` ago.
     """
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [IsAdminUser, ]
+    serializer_class = UserTotalWorkingHoursStatisicsSerializer
+    # the periods names are only in lowercase
+    period_name_with_days_count = {'week': 7, 'quarter': 91, 'year': 356}
 
     def get_queryset(self):
         return WorkTime.objects.filter(
-            owner=self.request.user,
-            unix_end_time__isnull=False,
+            end_datetime__isnull=False,
+            owner__is_staff=False,
         )
 
-    def calculate_work_times(self, queryset):
-        return queryset.annotate(
-            diff=F('unix_end_time') - F('unix_start_time')
+    def calculate_working_hours(self, queryset):
+        calc = queryset.annotate(
+            diff=F('end_datetime') - F('start_datetime')
         ).values('diff').aggregate(sum=Sum('diff'))
+        seconds_sum = (calc['sum'] or timedelta()).total_seconds()
+        return seconds_sum / 3600
 
-    def get_statistics_before(self, **kwargs):
-        """
-        Calculates the work time since a previous date.
-        """
-        previous_date = (
-                timezone.now() - timedelta(**kwargs)
-        ).date()
+    def get(self, request, period, user_id):
+        days_count = self.period_name_with_days_count.get(period.lower())
+        if days_count is None:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        work_times = self.calculate_work_times(
-            self.get_queryset().filter(
-                start_date__gte=previous_date
-            )
+        today_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        previous_datetime = today_datetime - timedelta(days=days_count)
+
+        serializer = self.serializer_class(
+            {
+                'total_working_hours': self.calculate_working_hours(
+                    self.get_queryset().filter(
+                        owner=user_id, start_datetime__gte=previous_datetime
+                    ).exclude(
+                        start_datetime__gt=today_datetime
+                    ))
+            }
         )
 
         return Response(
-            {"total_working_time_in_seconds": work_times['sum']},
+            serializer.data,
             status.HTTP_200_OK
         )
 
-    def get(self, request, period, form=None):
 
-        if period.lower() == 'week':
-            return self.get_statistics_before(weeks=1)
-        elif period == 'quarter':
-            return self.get_statistics_before(weeks=13)
-            pass
-        elif period == 'year':
-            return self.get_statistics_before(days=356)
-            pass
-
-        return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-class EmployeesArrivalAndLeavingTimesStatisticsDetail(APIView):
+class EmployeesArrivalAndLeavingTimesStatisticsDetail(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
-    Retrieve the employees arrival time and leaving times.
+    Retrieve the employee arrival time and leaving time.
     """
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [IsAdminUser, ]
+    serializer_class = EmployeesArrivalAndLeavingTimesSerializer
+    lookup_url_kwarg = 'user_id'
 
     def get_queryset(self):
-        return User.objects.all()
+        return User.objects.filter(is_staff=False)
 
-    def get(self, request, form=None):
-        response = []
-
-        employees_stats = self.get_queryset().values(
-            'work_times__start_date', 'username'
+    def retrieve(self, request, *args, **kwargs):
+        user = self.get_object()
+        employees_stats = WorkTime.objects.filter(owner=user).values(
+            day=TruncDay('start_datetime'),
         ).annotate(
-            min=Min('work_times__unix_start_time'),
-            max=Max('work_times__unix_end_time')
-        ).values(
-            'username', 'min', 'max'
+            min=TruncTime(Min('start_datetime')),
+            max=TruncTime(Max('end_datetime')),
+        ).aggregate(
+            avg_start=Avg('min', output_field=TimeField()),
+            avg_end=Avg('max', output_field=TimeField())
         )
+        avg_arrival = None
+        avg_leave = None
 
-        users = User.objects.all().values_list('username', flat=True)
-        for user in users:
-            average_time = employees_stats.filter(
-                username=user
-            ).values('min', 'max').aggregate(
-                avg_start=Avg('min'),
-                avg_end=Avg('max')
-            )
-            response.append({
-                'user': user,
-                'average_arrival_time':
-                    convert_unix_to_time(average_time['avg_start']),
-                'average_leaving_time':
-                    convert_unix_to_time(average_time['avg_end']),
-            })
+        if employees_stats['avg_start'] is not None:
+            avg_arrival = datetime.utcfromtimestamp(employees_stats['avg_start'].total_seconds()).time()
 
-        return Response(response, status.HTTP_200_OK)
+        if employees_stats['avg_end'] is not None:
+            avg_leave = datetime.utcfromtimestamp(employees_stats['avg_end'].total_seconds()).time()
+
+        serializer = self.get_serializer({
+            'username': user.username,
+            'average_arrival_time': avg_arrival,
+            'average_leaving_time': avg_leave,
+        })
+        return Response(serializer.data)
 
 
-class WorkingHoursToLeavingHoursStatisticsDetail(APIView):
+class WorkingHoursToLeavingHoursStatisticsDetail(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     Retrieve the team working hours to leaving hours
     """
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [IsAdminUser, ]
+    serializer_class = TeamWorkingToLeavingTimeStatisticsSerializer
 
-    def get_queryset(self):
-        return User.objects.filter(
-            work_times__unix_end_time__isnull=False
+    def list(self, request, *args, **kwargs):
+        """
+        working time = select all the time and sum it together
+        leaving time = sum all the leaving time per day for the user and sum them
+        """
+        stats = User.objects.filter(is_staff=False, work_times__end_datetime__isnull=False).annotate(
+            work_time=F('work_times__end_datetime') - F('work_times__start_datetime'),
+            end_datetime=F('work_times__end_datetime'),
+            start_datetime=F('work_times__start_datetime'),
+            day=TruncDay('work_times__start_datetime', output_field=DateField())
+        ).values('username', 'day').annotate(
+            total_work_time_per_day=Sum('work_time'),
+            start_to_end_time_per_day=(Max('end_datetime') - Min('start_datetime'))
+        ).values(
+            'username', 'total_work_time_per_day', 'start_to_end_time_per_day'
+        )
+        # import pdb;pdb.set_trace()
+        stats = stats.aggregate(
+            leaving_hours=Sum(F('start_to_end_time_per_day') - F('total_work_time_per_day')),
+            working_hours=Sum('total_work_time_per_day'),
         )
 
-    def get(self, request, form=None):
-        stats = self.get_queryset().annotate(
-            work_time=F(
-                'work_times__unix_end_time'
-            ) - F(
-                'work_times__unix_start_time'
-            )
-        ).values(
-            'work_times__start_date', 'username'
-        ).annotate(
-            start_to_end_hours=(Max(
-                'work_times__unix_end_time', output_field=FloatField()
-            ) - Min(
-                'work_times__unix_start_time', output_field=FloatField()
-            )) / 3600.0,
-            work_time_sum_hours=Sum(
-                'work_time', output_field=FloatField()
-            ) / 3600.0,
-        ).values(
-            'start_to_end_hours', 'work_time_sum_hours'
-        ).aggregate(
-            leave_hours=Sum(
-                F('start_to_end_hours') - F('work_time_sum_hours')
-            ),
-            work_hours=Sum('work_time_sum_hours'),
-        )
+        working_hours = (stats['working_hours'] or timedelta()).total_seconds() / 3600
+        leaving_hours = (stats['leaving_hours'] or timedelta()).total_seconds() / 3600
+        work_on_leve_time = None
+        if leaving_hours != 0:
+            work_on_leve_time = working_hours / leaving_hours * 100
 
-        if stats['leave_hours'] == 0:
-            work_over_leave = None
-        else:
-            work_over_leave = stats['work_hours'] / stats['leave_hours'] * 100
+        serializer = self.get_serializer({
+            'working_hours': working_hours,
+            'leaving_hours': leaving_hours,
+            'percentage_of_working_on_leaving_time': work_on_leve_time,
+        })
 
-        response = {
-            'working_hours': stats['work_hours'],
-            'leaving_hours': stats['leave_hours'],
-            'work_on_leave_hours': work_over_leave,
-        }
-
-        return Response(response, status.HTTP_200_OK)
+        return Response(serializer.data, status.HTTP_200_OK)
