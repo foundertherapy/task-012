@@ -28,14 +28,13 @@ def get_future_year_starting_date(add_years=2):
     return date(timezone.now().date().year + add_years, 1, 1)
 
 
-def sample_vacation(user, add_years=0, **params):
+def sample_vacation(user, add_years=0, number_of_days=1):
     """Create and return a sample event"""
     defaults = {
         'brief_description': 'Sample vacation brief description',
         'start_date': get_future_year_starting_date(add_years),
-        'number_of_days': 1
+        'end_date': get_future_year_starting_date(add_years) + timedelta(number_of_days-1)
     }
-    defaults.update(params)
 
     return Vacation.objects.create(owner=user, **defaults)
 
@@ -82,7 +81,7 @@ class PrivateVacationsApiTests(TestCase):
         payload = {
             'brief_description': 'test brief description',
             'start_date': get_future_year_starting_date() + timedelta(days=1),
-            'number_of_days': 2
+            'end_date': get_future_year_starting_date() + timedelta(days=1),
         }
 
         res = self.client.post(VACATION_URL, payload)
@@ -91,7 +90,7 @@ class PrivateVacationsApiTests(TestCase):
         exists = Vacation.objects.filter(
             brief_description=payload['brief_description'],
             start_date=payload['start_date'],
-            number_of_days=payload['number_of_days'],
+            end_date=payload['end_date'],
             owner=self.user,
         ).exists()
         self.assertTrue(exists)
@@ -101,12 +100,13 @@ class PrivateVacationsApiTests(TestCase):
         payload = {
             'brief_description': 'test brief description',
             'start_date': get_future_year_starting_date() + timedelta(days=1),
-            'number_of_days': 17
+            'end_date': get_future_year_starting_date() + timedelta(days=17),
         }
 
         res = self.client.post(VACATION_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("You can't have a vacation for more than 16 day!", res.data.get('non_field_errors')[0])
 
     def test_add_more_than_16_days_with_two_requests(self):
         """
@@ -116,12 +116,12 @@ class PrivateVacationsApiTests(TestCase):
         payload1 = {
             'brief_description': 'test brief description 1',
             'start_date': get_future_year_starting_date() + timedelta(days=1),
-            'number_of_days': 12
+            'end_date': get_future_year_starting_date() + timedelta(days=12),
         }
         payload2 = {
             'brief_description': 'test brief description 2',
             'start_date': get_future_year_starting_date() + timedelta(days=14),
-            'number_of_days': 5
+            'end_date': get_future_year_starting_date() + timedelta(days=19),
         }
 
         res1 = self.client.post(VACATION_URL, payload1)
@@ -140,7 +140,7 @@ class PrivateVacationsApiTests(TestCase):
         payload = {
             'brief_description': 'test brief description',
             'start_date': timezone.now().date(),
-            'number_of_days': 16
+            'end_date': timezone.now().date() + timedelta(days=15),
         }
 
         res = self.client.post(VACATION_URL, payload)
@@ -154,7 +154,7 @@ class PrivateVacationsApiTests(TestCase):
         payload = {
             'brief_description': vacation.brief_description + '-new update',
             'start_date': vacation.start_date,
-            'number_of_days': vacation.number_of_days,
+            'end_date': vacation.end_date,
         }
 
         res = self.client.put(url, payload)
@@ -164,7 +164,7 @@ class PrivateVacationsApiTests(TestCase):
         self.assertEqual(vacation.brief_description,
                          payload['brief_description'])
         self.assertEqual(vacation.start_date, payload['start_date'])
-        self.assertEqual(vacation.number_of_days, payload['number_of_days'])
+        self.assertEqual(vacation.end_date, payload['end_date'])
 
     def test_partially_update_event_successful(self):
         """Test partially update a vacation"""
@@ -213,17 +213,129 @@ class PrivateVacationsWithEventsApiTests(TestCase):
         )
         self.client.force_authenticate(self.user)
 
+    def test_add_vacation_after_the_event_date(self):
+        """Test add a vacation after an event"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['start_date'] - timedelta(3),
+            'end_date': payload['start_date'] - timedelta(1)
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_add_vacation_before_the_event_date(self):
+        """Test add a vacation before an event"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['end_date'] + timedelta(1),
+            'end_date': payload['end_date'] + timedelta(3)
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
     def test_add_vacation_on_the_same_day_as_an_event(self):
         """Test add a vacation that intersects with an event"""
         payload = {
             'brief_description': 'test brief description',
             'start_date': timezone.now().date(),
-            'number_of_days': 16
+            'end_date': timezone.now().date() + timedelta(15)
         }
         event = {
             'title': 'school visit day',
             'start_date': payload['start_date'],
-            'end_date': payload['start_date']
+            'end_date': payload['end_date']
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+        self.assertTrue(len(res.data.get('events_urls')) == 1)
+
+    def test_add_vacation_when_the_event_start_before_the_vacation(self):
+        """Test add a vacation that intersects with an event start_date"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['start_date'] - timedelta(5),
+            'end_date': payload['end_date'] - timedelta(5)
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+        self.assertTrue(len(res.data.get('events_urls')) == 1)
+
+    def test_add_vacation_when_the_vacation_starts_before_the_event(self):
+        """Test add a vacation that intersects with an event end_date"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['start_date'] + timedelta(5),
+            'end_date': payload['end_date'] + timedelta(5)
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+        self.assertTrue(len(res.data.get('events_urls')) == 1)
+
+    def test_add_vacation_when_the_vacation_is_inside_the_event_dates(self):
+        """Test add a vacation that vacation is included in the event dates"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['start_date'] - timedelta(1),
+            'end_date': payload['end_date'] + timedelta(1)
+        }
+        event = Event.objects.create(created_by=self.user, **event)
+
+        res = self.client.post(VACATION_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+        self.assertTrue(len(res.data.get('events_urls')) == 1)
+
+    def test_add_vacation_when_the_event_is_inside_the_vacation_dates(self):
+        """Test add a vacation that event is included in the vacation dates"""
+        payload = {
+            'brief_description': 'test brief description',
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timedelta(15)
+        }
+        event = {
+            'title': 'school visit day',
+            'start_date': payload['start_date'] + timedelta(1),
+            'end_date': payload['end_date'] - timedelta(1)
         }
         event = Event.objects.create(created_by=self.user, **event)
 
