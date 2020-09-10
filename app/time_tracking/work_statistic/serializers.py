@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from django.urls import reverse
+from rest_framework.reverse import reverse
 
 
 class EmployeesArrivalAndLeavingTimesSerializer(serializers.Serializer):
@@ -39,26 +39,14 @@ class UsersAvailableWorkTimeStatisticsSerializer(serializers.HyperlinkedModelSer
         ]
 
     def get_total_working_hours(self, obj):
+        periods = ['week', 'quarter', 'year']
         return {
-            'year': reverse(
+            period: reverse(
                 'work-time-periods-statistic',
                 kwargs={
-                    'period': 'year',
+                    'period': period,
                     'user_id': obj.pk
-                }
-            ),
-            'quarter': reverse(
-                'work-time-periods-statistic',
-                kwargs={
-                    'period': 'quarter',
-                    'user_id': obj.pk
-                }
-            ),
-            'week': reverse(
-                'work-time-periods-statistic',
-                kwargs={
-                    'period': 'week',
-                    'user_id': obj.pk
-                }
-            ),
+                },
+                request=self.context['request'],
+            ) for period in periods
         }
