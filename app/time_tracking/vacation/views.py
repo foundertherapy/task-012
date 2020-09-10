@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.db.models import Sum
+from django.db.models import Sum, F
 from django.urls import reverse
 
 from rest_framework import viewsets
@@ -32,20 +32,22 @@ class VacationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        vacations_count = Vacation.objects.filter(
+        vacations = Vacation.objects.filter(
             owner=self.request.user,
             start_date__gte=date(timezone.now().year, 1, 1),
-        ).aggregate(Sum('number_of_days'))['number_of_days__sum']
+        ).aggregate(sum=Sum(1 + F('end_date') - F('start_date')))
 
-        if vacations_count is not None:
-            if vacations_count >= 16:
+        if vacations['sum'] is not None:
+            if vacations['sum'].days >= 16:
                 return Response(
                     {"detail": _("Reached max vacations days")},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            remaining_days = 16 - vacations_count
-            if remaining_days-serializer.validated_data['number_of_days'] < 0:
+            requested_vacation_days = 1 + (
+                    serializer.validated_data['end_date'] - serializer.validated_data['start_date']).days
+            remaining_days = 16 - vacations['sum'].days
+            if remaining_days - requested_vacation_days < 0:
                 return Response(
                     {"detail": _("Can't add more than %(days)s") % {
                         'days': remaining_days
@@ -53,14 +55,14 @@ class VacationViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        last_vacation_date = (
-                serializer.validated_data['start_date'] +
-                timedelta(days=serializer.validated_data['number_of_days'])
-        )
-
         events_intersection = Event.objects.filter(
-            start_date__lte=last_vacation_date,
             end_date__gte=serializer.validated_data['start_date']
+        ).filter(
+            start_date__lte=serializer.validated_data['end_date']
+        ).exclude(
+            start_date__gt=serializer.validated_data['end_date']
+        ).exclude(
+            end_date__lt=serializer.validated_data['start_date']
         ).values('id')
 
         if len(events_intersection) != 0:

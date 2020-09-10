@@ -6,15 +6,39 @@ from time_tracking.vacation.models import Vacation
 
 
 class VacationSerializer(serializers.ModelSerializer):
-    number_of_days = serializers.IntegerField(max_value=16, min_value=1)
     owner = serializers.ReadOnlyField(source='owner.username')
 
     class Meta:
         model = Vacation
         fields = [
-            'id', 'url', 'brief_description', 'start_date',
-            'number_of_days', 'owner'
+            'id', 'url', 'brief_description',
+            'start_date', 'end_date', 'owner'
         ]
+
+    def validate(self, data):
+        """
+        Check that start date is not after the end date
+        """
+        if data.get('end_date') is None:
+            end_date = self.instance.end_date
+        else:
+            end_date = data['end_date']
+
+        if data.get('start_date') is None:
+            start_date = self.instance.end_date
+        else:
+            start_date = data['start_date']
+
+        if end_date < start_date:
+            raise serializers.ValidationError(
+                _("end_date must not occur before start_date")
+            )
+
+        if (end_date - start_date).days + 1 > 16:
+            raise serializers.ValidationError(
+                _("You can't have a vacation for more than 16 day!")
+            )
+        return data
 
     def validate_start_date(self, value):
         """
@@ -32,12 +56,17 @@ class VacationSerializer(serializers.ModelSerializer):
             )
         return value
 
-    def validate_number_of_days(self, value):
+    def validate_end_date(self, value):
         """
-        Check that the number_of_days was not modify
+        Check that the end_date was not modify
         """
-        if self.instance and self.instance.number_of_days != value:
+        if self.instance and self.instance.end_date != value:
             raise serializers.ValidationError(
-                _("Changing number_of_days is not allowed")
+                _("Changing end_date is not allowed")
+            )
+
+        if self.instance is None and value < timezone.now().date():
+            raise serializers.ValidationError(
+                _("end_date can not be from the past")
             )
         return value

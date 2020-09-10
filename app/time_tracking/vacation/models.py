@@ -8,7 +8,7 @@ class Vacation(models.Model):
 
     brief_description = models.CharField(max_length=120, blank=True, default='')
     start_date = models.DateField()
-    number_of_days = models.PositiveSmallIntegerField()
+    end_date = models.DateField()
     owner = models.ForeignKey(
         User,
         limit_choices_to={'is_staff': False},
