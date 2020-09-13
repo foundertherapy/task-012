@@ -10,7 +10,6 @@ from rest_framework.test import APIClient
 from time_tracking.vacation.models import Vacation
 from time_tracking.event.models import Event
 
-
 VACATION_URL = reverse('vacation-list')
 
 
@@ -33,7 +32,10 @@ def sample_vacation(user, add_years=0, number_of_days=1):
     defaults = {
         'brief_description': 'Sample vacation brief description',
         'start_date': get_future_year_starting_date(add_years),
-        'end_date': get_future_year_starting_date(add_years) + timedelta(number_of_days-1)
+        'end_date': (
+                get_future_year_starting_date(add_years)
+                + timedelta(number_of_days - 1)
+        )
     }
 
     return Vacation.objects.create(owner=user, **defaults)
@@ -106,7 +108,10 @@ class PrivateVacationsApiTests(TestCase):
         res = self.client.post(VACATION_URL, payload)
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("You can't have a vacation for more than 16 day!", res.data.get('non_field_errors')[0])
+        self.assertIn(
+            "You can't have a vacation for more than 16 day!",
+            res.data.get('non_field_errors')[0]
+        )
 
     def test_add_more_than_16_days_with_two_requests(self):
         """

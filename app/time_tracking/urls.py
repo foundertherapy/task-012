@@ -15,18 +15,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken import views
+from rest_framework.routers import DefaultRouter
 
 from rest_framework.urlpatterns import format_suffix_patterns
 from time_tracking.event.views import EventViewSet
+from time_tracking.vacation.views import VacationViewSet
 from time_tracking.work_statistic.views import (
+    EmployeesArrivalAndLeavingTimesStatisticsDetail,
     WorkTimeStatisticsDetail,
     WorkTimeUsersAvailableStatistics,
-    EmployeesArrivalAndLeavingTimesStatisticsDetail,
     WorkingHoursToLeavingHoursStatisticsDetail,
 )
-from time_tracking.vacation.views import VacationViewSet
 from time_tracking.work_time.views import WorkTimeViewSet
 
 

@@ -9,7 +9,7 @@ docker-compose exec time_tracking sh -c "python manage.py loaddata fixtures/user
 docker-compose exec time_tracking sh -c "python manage.py compilemessages"
 docker-compose exec time_tracking sh -c "python manage.py createcachetable"
 docker-compose exec time_tracking sh -c "python manage.py test" # run the tests
-docker-compose exec time_tracking sh -c "python manage.py flake8" # run flake8
+docker-compose exec time_tracking sh -c "flake8" # run flake8
 ```
 
 # PostgreSQL Environment variables

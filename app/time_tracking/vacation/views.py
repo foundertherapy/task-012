@@ -1,17 +1,17 @@
-from datetime import date, timedelta
-from django.utils import timezone
-from django.utils.translation import gettext as _
+from datetime import date
 from django.db.models import Sum, F
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.translation import gettext as _
 
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.response import Response
-from rest_framework import status
 
+from time_tracking.event.models import Event
 from time_tracking.vacation.models import Vacation
 from time_tracking.vacation.permissions import IsOwner
 from time_tracking.vacation.serializers import VacationSerializer
-from time_tracking.event.models import Event
 
 
 class VacationViewSet(viewsets.ModelViewSet):
@@ -45,7 +45,9 @@ class VacationViewSet(viewsets.ModelViewSet):
                 )
 
             requested_vacation_days = 1 + (
-                    serializer.validated_data['end_date'] - serializer.validated_data['start_date']).days
+                    serializer.validated_data['end_date']
+                    - serializer.validated_data['start_date']
+            ).days
             remaining_days = 16 - vacations['sum'].days
             if remaining_days - requested_vacation_days < 0:
                 return Response(

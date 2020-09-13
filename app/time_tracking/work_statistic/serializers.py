@@ -19,7 +19,9 @@ class UserTotalWorkingHoursStatisicsSerializer(serializers.Serializer):
     total_working_hours = serializers.IntegerField()
 
 
-class UsersAvailableWorkTimeStatisticsSerializer(serializers.HyperlinkedModelSerializer):
+class UsersAvailableWorkTimeStatisticsSerializer(
+    serializers.HyperlinkedModelSerializer
+):
 
     id = serializers.ReadOnlyField()
     username = serializers.ReadOnlyField()
@@ -30,12 +32,15 @@ class UsersAvailableWorkTimeStatisticsSerializer(serializers.HyperlinkedModelSer
     )
     total_working_hours = serializers.SerializerMethodField()
 
-    url = serializers.HyperlinkedIdentityField(view_name='worktime-available-statistics-detail')
+    url = serializers.HyperlinkedIdentityField(
+        view_name='worktime-available-statistics-detail'
+    )
 
     class Meta:
         model = User
         fields = [
-            'id', 'url', 'username', 'total_working_hours', 'working_hours_to_leaving_hours'
+            'id', 'url', 'username',
+            'total_working_hours', 'working_hours_to_leaving_hours'
         ]
 
     def get_total_working_hours(self, obj):
