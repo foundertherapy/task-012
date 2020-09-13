@@ -1,10 +1,9 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
+from model_utils.models import TimeStampedModel
 
 
-class Vacation(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class Vacation(TimeStampedModel):
 
     brief_description = models.CharField(max_length=120, blank=True, default='')
     start_date = models.DateField()

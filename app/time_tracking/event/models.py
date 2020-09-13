@@ -1,10 +1,10 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
+from model_utils.models import TimeStampedModel
 
 
-class Event(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class Event(TimeStampedModel):
+
     created_by = models.ForeignKey(
         User, limit_choices_to={'is_staff': True},
         on_delete=models.SET_NULL,

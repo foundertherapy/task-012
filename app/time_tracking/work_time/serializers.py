@@ -1,18 +1,19 @@
 from django.utils.translation import gettext as _
 from rest_framework import serializers
+
 from time_tracking.work_time.models import WorkTime
 
 
 class WorkTimeSerializer(serializers.ModelSerializer):
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+    created = serializers.DateTimeField(read_only=True)
+    modified = serializers.DateTimeField(read_only=True)
 
     owner = serializers.ReadOnlyField(source="owner.username")
 
     class Meta:
         model = WorkTime
         fields = [
-            'id', 'url', 'created_at', 'updated_at',
+            'id', 'url', 'created', 'modified',
             'start_datetime', 'end_datetime', 'owner'
         ]
 

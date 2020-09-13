@@ -1,10 +1,9 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
+from model_utils.models import TimeStampedModel
 
 
-class WorkTime(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class WorkTime(TimeStampedModel):
 
     start_datetime = models.DateTimeField()
     end_datetime = models.DateTimeField(blank=True, null=True)
