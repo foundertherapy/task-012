@@ -1,0 +1,92 @@
+[
+  {
+    "model": "auth.user",
+    "pk": 1,
+    "fields": {
+      "password": "pbkdf2_sha256$216000$F0dlaJuv7AsL$duDS6o1yMmazBQnnOZLVU3NMLWzHB9pcCyjI9Dcav+4=",
+      "last_login": null,
+      "is_superuser": true,
+      "username": "admin",
+      "first_name": "",
+      "last_name": "",
+      "email": "admin@admin.admin",
+      "is_staff": true,
+      "is_active": true,
+      "date_joined": "2020-08-06T12:10:24.399Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 2,
+    "fields": {
+      "password": "pbkdf2_sha256$180000$7pqm6zAaWmCe$l7cCgbICilx5kz8LHJ5xh0g1Zx1Q+xuRkFh8fx8AnZI=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "waseem",
+      "first_name": "",
+      "last_name": "",
+      "email": "waseem@foundertherapy.co",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2020-08-06T12:10:24.399Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 3,
+    "fields": {
+      "password": "pbkdf2_sha256$180000$htF9zN6ud9Fr$NCqkFGNoc/zcfJuSpTO3HDjq7GowV/TuwnYde73X3m0=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "motasem",
+      "first_name": "",
+      "last_name": "",
+      "email": "motasem@foundertherapy.co",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2020-08-06T12:10:24.399Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 4,
+    "fields": {
+      "password": "pbkdf2_sha256$180000$33CjJbgsof0J$2/m9gv/36qRfgS7ZAwgMsEq2UFLy2mfVjAABdYOrWDA=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "ayman",
+      "first_name": "",
+      "last_name": "",
+      "email": "ayman@foundertherapy.co",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2020-08-06T12:10:24.399Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 5,
+    "fields": {
+      "password": "pbkdf2_sha256$180000$A0MgsVEXpfMN$t5fo3EnchdIFTUFnkryDAk/Uwl3lYt5VUbiCF9IYzzU=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "moath",
+      "first_name": "",
+      "last_name": "",
+      "email": "moath.zaghdad@pm.me",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2020-08-06T12:10:24.399Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  }
+]
